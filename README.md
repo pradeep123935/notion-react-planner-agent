@@ -1,6 +1,6 @@
 # Notion ReAct Planner Agent
 
-An AI-powered planning assistant that uses ReAct reasoning and Notion APIs to dynamically plan, prioritize, and manage daily tasks.
+Agentic AI planner that dynamically creates, prioritizes, and manages daily tasks using LLM reasoning and tool execution.
 
 # Backend
 
@@ -10,5 +10,4 @@ An AI-powered planning assistant that uses ReAct reasoning and Notion APIs to dy
 - **LangChain** — Framework for building LLM-powered applications
 - **LangChain-MistralAI** — Integration for Mistral AI models
 - **LangGraph** — Graph-based orchestration for LLM workflows
-- **Notion Client** — Python client for Notion API
 - **python-dotenv** — For environment variable management
