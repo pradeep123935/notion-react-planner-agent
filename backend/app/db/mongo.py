@@ -1,12 +1,24 @@
-import os
-
 from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
+from app.core.config import settings
+from app.core.logging import logger
 
-load_dotenv()
+class MongoDB:
+    client: AsyncIOMotorClient = None
+    db = None
 
-MONGO_URL = os.getenv("MONGODB_URI")
+    async def connect_to_storage(self):
+        logger.info("Connecting to MongoDB...")
+        self.client = AsyncIOMotorClient(settings.MONGODB_URI)
+        self.db = self.client[settings.DATABASE_NAME]
+        logger.info("Connected to MongoDB successfully.")
 
-client = AsyncIOMotorClient(MONGO_URL)
+    async def close_storage_connection(self):
+        logger.info("Closing MongoDB connection...")
+        if self.client:
+            self.client.close()
+        logger.info("MongoDB connection closed.")
 
-db = client["planner_agent"]
+db_manager = MongoDB()
+
+async def get_database():
+    return db_manager.db

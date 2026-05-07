@@ -1,12 +1,13 @@
 from datetime import datetime
 
 
-from app.db.mongo import db
+from app.db.mongo import db_manager
+from app.core.logging import logger
 from app.services.llm import generate_tasks
 
 async def generate_and_insert_ai_tasks(prompt: str):
     ai_tasks = generate_tasks(prompt)
-    print(f"Generated AI Tasks: {ai_tasks}")
+    logger.info(f"Generated AI Tasks: {ai_tasks}")
     inserted_ids = []
     for task in ai_tasks:
         task_data = {
@@ -23,13 +24,13 @@ async def generate_and_insert_ai_tasks(prompt: str):
 
 async def create_task(task_data: dict):
     task_data["created_at"] = datetime.utcnow()
-    result = await db.tasks.insert_one(task_data)
+    result = await db_manager.db.tasks.insert_one(task_data)
     return str(result.inserted_id)
 
 
 async def get_tasks():
     tasks = []
-    cursor = db.tasks.find()
+    cursor = db_manager.db.tasks.find()
     async for task in cursor:
         task["_id"] = str(task["_id"])
         tasks.append(task)

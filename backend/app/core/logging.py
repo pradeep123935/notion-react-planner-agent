@@ -1,0 +1,18 @@
+import logging
+import sys
+from app.core.config import settings
+
+def setup_logging():
+    logging.root.handlers = []
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    
+logger = logging.getLogger(settings.PROJECT_NAME)
+logger.setLevel(logging.INFO)
