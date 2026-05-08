@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     
     MONGODB_URI: str
     DATABASE_NAME: str = "planner_agent"
+    
+    JWT_SECRET_KEY: str = "secret_key" 
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 1 week
 
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
 

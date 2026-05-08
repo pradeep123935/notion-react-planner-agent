@@ -13,4 +13,5 @@ class TaskCreate(BaseModel):
 
 class TaskResponse(TaskCreate):
     id: str
+    user_id: str
     created_at: datetime
