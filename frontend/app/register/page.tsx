@@ -18,8 +18,8 @@ import { ThemeToggle } from "@/app/components/ThemeToggle";
 const registerSchema = z.object({
   full_name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  confirm_password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters").max(72, "Password must be 72 characters or fewer"),
+  confirm_password: z.string().min(6, "Password must be at least 6 characters").max(72, "Password must be 72 characters or fewer"),
 }).refine((data) => data.password === data.confirm_password, {
   message: "Passwords do not match",
   path: ["confirm_password"],
@@ -53,7 +53,7 @@ export default function RegisterPage() {
         email: data.email,
         password: data.password,
         redirect: false,
-        callbackUrl: "/onboarding",
+        callbackUrl: "/dashboard",
       });
 
       if (result?.error) {
@@ -61,7 +61,7 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push(result?.url ?? "/onboarding");
+      router.push(result?.url ?? "/dashboard");
       router.refresh();
     } catch (err: unknown) {
       const detail = err instanceof AxiosError ? err.response?.data?.detail : null;

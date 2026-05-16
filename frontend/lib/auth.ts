@@ -6,6 +6,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1
 type BackendLoginResponse = {
   access_token: string;
   token_type: string;
+  user?: {
+    id: string;
+    email: string;
+    full_name?: string | null;
+    onboarding_completed?: boolean;
+  };
 };
 
 export const authOptions: NextAuthOptions = {
@@ -31,6 +37,10 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        if (password.length > 72 || new TextEncoder().encode(password).length > 72) {
+          return null;
+        }
+
         const formData = new URLSearchParams();
         formData.set("username", email);
         formData.set("password", password);
@@ -49,12 +59,14 @@ export const authOptions: NextAuthOptions = {
         }
 
         const data = (await response.json()) as BackendLoginResponse;
+        const user = data.user;
 
         return {
-          id: email,
-          email,
-          name: email.split("@")[0],
+          id: user?.id ?? email,
+          email: user?.email ?? email,
+          name: user?.full_name ?? email.split("@")[0],
           accessToken: data.access_token,
+          onboardingCompleted: user?.onboarding_completed ?? false,
         };
       },
     }),
@@ -63,12 +75,14 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.accessToken = user.accessToken;
+        token.onboardingCompleted = user.onboardingCompleted;
       }
 
       return token;
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken;
+      session.user.onboardingCompleted = token.onboardingCompleted;
       return session;
     },
   },

@@ -8,7 +8,7 @@ import { ThemeToggle } from "@/app/components/ThemeToggle";
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   
-  const isPublicPage = ["/", "/login", "/register", "/signup", "/onboarding"].includes(pathname);
+  const isPublicPage = ["/", "/login", "/register", "/signup"].includes(pathname);
 
   if (isPublicPage) {
     return <>{children}</>;
