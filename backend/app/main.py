@@ -9,6 +9,8 @@ from app.db.mongo import db_manager
 from app.routes.task_routes import router as task_router
 from app.routes.auth_routes import router as auth_router
 from app.routes.calendar_routes import router as calendar_router
+from app.routes.goal_routes import router as goal_router
+from app.routes.project_routes import router as project_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,6 +44,8 @@ if settings.BACKEND_CORS_ORIGINS:
 app.include_router(task_router, prefix=settings.API_V1_STR)
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth")
 app.include_router(calendar_router, prefix=f"{settings.API_V1_STR}/calendar")
+app.include_router(goal_router, prefix=f"{settings.API_V1_STR}/goals")
+app.include_router(project_router, prefix=f"{settings.API_V1_STR}/projects")
 
 @app.get("/")
 async def root():

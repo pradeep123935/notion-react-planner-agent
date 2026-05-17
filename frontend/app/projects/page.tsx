@@ -1,104 +1,282 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  BarChart3,
-  BookOpen,
   BriefcaseBusiness,
   CalendarDays,
   Check,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Code2,
-  Filter,
-  Grid2X2,
-  List,
-  MoreVertical,
+  ChevronDown,
+  FolderKanban,
+  Loader2,
+  Pencil,
   Plus,
-  Rocket,
   Search,
-  Sparkles,
   Target,
-  Trophy,
+  Trash2,
+  X,
 } from "lucide-react";
 
-const stats = [
-  { label: "Total Projects", value: "12", sub: "Across all goals", icon: Target, color: "#94A3B8" },
-  { label: "On Track", value: "7", sub: "58% of projects", icon: Check, color: "#22C55E" },
-  { label: "At Risk", value: "3", sub: "25% of projects", icon: AlertTriangle, color: "#F97316" },
-  { label: "Completed", value: "2", sub: "17% of projects", icon: CheckCircle2, color: "#7C3AED" },
-];
+type ProjectStatus = "not_started" | "active" | "paused" | "completed" | "archived";
+type ProjectPriority = "low" | "medium" | "high";
+type ProjectType = "learning" | "build" | "practice" | "research" | "admin" | "health" | "other";
 
-const projects = [
-  { title: "DSA Preparation", goal: "Crack top product based company", icon: Code2, progress: 72, tasks: "16 / 22", deadline: "Dec 31, 2024", status: "On Track", color: "#7C3AED" },
-  { title: "System Design", goal: "Crack top product based company", icon: BriefcaseBusiness, progress: 55, tasks: "11 / 20", deadline: "Jan 15, 2025", status: "At Risk", color: "#3B82F6" },
-  { title: "Backend Development", goal: "Build a SaaS product", icon: Rocket, progress: 65, tasks: "13 / 20", deadline: "Aug 20, 2024", status: "On Track", color: "#22C55E" },
-  { title: "Mock Interviews", goal: "Crack top product based company", icon: BriefcaseBusiness, progress: 40, tasks: "4 / 10", deadline: "May 30, 2024", status: "At Risk", color: "#F97316" },
-  { title: "Resume Building", goal: "Crack top product based company", icon: Trophy, progress: 80, tasks: "8 / 10", deadline: "May 25, 2024", status: "On Track", color: "#F59E0B" },
-  { title: "Frontend Development", goal: "Build a SaaS product", icon: BookOpen, progress: 20, tasks: "2 / 10", deadline: "Sep 10, 2024", status: "Behind", color: "#F43F5E" },
-];
+type GoalOption = {
+  id: string;
+  title: string;
+};
 
-const deadlines = [
-  { title: "System Design", date: "Jan 15, 2025", left: "59 days left", icon: BriefcaseBusiness, color: "#7C3AED" },
-  { title: "Backend Development", date: "Aug 20, 2024", left: "35 days left", icon: Rocket, color: "#22C55E" },
-  { title: "Frontend Development", date: "Sep 10, 2024", left: "56 days left", icon: BookOpen, color: "#F43F5E" },
-];
+type Project = {
+  id: string;
+  title: string;
+  goal_id: string;
+  goal_title: string;
+  description?: string | null;
+  type: ProjectType;
+  priority: ProjectPriority;
+  status: ProjectStatus;
+  target_date?: string | null;
+  progress: number;
+  created_at: string;
+};
 
-const goalWise = [
-  { label: "Crack top product based company", value: "5 / 6", width: 83, color: "#7C3AED" },
-  { label: "Build a SaaS product", value: "3 / 4", width: 75, color: "#3B82F6" },
-  { label: "Personal Growth", value: "2 / 2", width: 100, color: "#22C55E" },
-  { label: "Health & Fitness", value: "2 / 2", width: 100, color: "#F97316" },
-];
+type ProjectForm = {
+  title: string;
+  goal_id: string;
+  description: string;
+  type: ProjectType;
+  priority: ProjectPriority;
+  status: ProjectStatus;
+  target_date: string;
+};
+
+const emptyForm: ProjectForm = {
+  title: "",
+  goal_id: "",
+  description: "",
+  type: "other",
+  priority: "medium",
+  status: "not_started",
+  target_date: "",
+};
+
+const typeMeta: Record<ProjectType, { label: string; color: string; icon: React.ElementType }> = {
+  learning: { label: "Learning", color: "#F59E0B", icon: Target },
+  build: { label: "Build", color: "#7C3AED", icon: FolderKanban },
+  practice: { label: "Practice", color: "#22C55E", icon: CheckCircle2 },
+  research: { label: "Research", color: "#3B82F6", icon: Search },
+  admin: { label: "Admin", color: "#94A3B8", icon: BriefcaseBusiness },
+  health: { label: "Health", color: "#F97316", icon: Target },
+  other: { label: "Other", color: "#06B6D4", icon: FolderKanban },
+};
 
 function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <section className={`rounded-xl border border-app-border bg-app-panel shadow-[0_16px_50px_rgba(0,0,0,0.22)] ${className}`}>
-      {children}
-    </section>
-  );
+  return <section className={`rounded-xl border border-app-border bg-app-panel shadow-[0_16px_50px_rgba(0,0,0,0.14)] ${className}`}>{children}</section>;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const classes =
-    status === "Behind"
-      ? "bg-rose-500/15 text-rose-300"
-      : status === "At Risk"
-        ? "bg-orange-500/15 text-orange-300"
-        : "bg-emerald-500/12 text-emerald-300";
+function getProjectHealth(project: Project) {
+  if (project.status === "completed") return "Completed";
+  if (project.status === "paused") return "Paused";
+  if (!project.target_date || project.status === "not_started") return "Not Started";
 
-  return <span className={`rounded-md px-3 py-2 text-sm font-semibold ${classes}`}>{status}</span>;
+  const created = new Date(project.created_at).getTime();
+  const target = new Date(project.target_date).getTime();
+  const now = Date.now();
+
+  if (Number.isNaN(target) || target <= created) return project.progress >= 100 ? "Completed" : "At Risk";
+  if (now > target && project.progress < 100) return "At Risk";
+
+  const expectedProgress = Math.min(100, Math.max(0, ((now - created) / (target - created)) * 100));
+  return project.progress + 15 < expectedProgress ? "At Risk" : "On Track";
+}
+
+function StatusBadge({ label }: { label: string }) {
+  const classes =
+    label === "Completed"
+      ? "bg-purple-500/15 text-purple-500 dark:text-purple-300"
+      : label === "At Risk"
+        ? "bg-orange-500/15 text-orange-500 dark:text-orange-300"
+        : label === "Paused"
+          ? "bg-slate-500/15 text-slate-500 dark:text-slate-300"
+          : label === "Not Started"
+            ? "bg-blue-500/15 text-blue-500 dark:text-blue-300"
+            : "bg-emerald-500/15 text-emerald-500 dark:text-emerald-300";
+
+  return <span className={`rounded-md px-3 py-1.5 text-sm font-semibold ${classes}`}>{label}</span>;
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <label className="text-sm font-semibold text-app-secondary">{children}</label>;
 }
 
 export default function ProjectsPage() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [goals, setGoals] = useState<GoalOption[]>([]);
+  const [query, setQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState<ProjectForm>(emptyForm);
+
+  async function loadData() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [projectsResponse, goalsResponse] = await Promise.all([
+        fetch("/api/projects", { cache: "no-store" }),
+        fetch("/api/goals", { cache: "no-store" }),
+      ]);
+
+      if (!projectsResponse.ok || !goalsResponse.ok) throw new Error("Failed to load projects");
+      setProjects(await projectsResponse.json());
+      setGoals(await goalsResponse.json());
+    } catch {
+      setError("Could not load projects. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadData();
+  }, []);
+
+  const filteredProjects = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return projects;
+    return projects.filter((project) => `${project.title} ${project.description ?? ""} ${project.goal_title} ${project.type}`.toLowerCase().includes(term));
+  }, [projects, query]);
+
+  const stats = useMemo(() => {
+    const completed = projects.filter((project) => project.status === "completed").length;
+    const onTrack = projects.filter((project) => getProjectHealth(project) === "On Track").length;
+    const atRisk = projects.filter((project) => getProjectHealth(project) === "At Risk").length;
+
+    return [
+      { label: "Total Projects", value: String(projects.length), sub: "Across all goals", icon: Target, color: "#7C3AED" },
+      { label: "On Track", value: String(onTrack), sub: "Healthy projects", icon: Check, color: "#22C55E" },
+      { label: "At Risk", value: String(atRisk), sub: "Need attention", icon: AlertTriangle, color: "#F97316" },
+      { label: "Completed", value: String(completed), sub: "Finished projects", icon: CheckCircle2, color: "#3B82F6" },
+    ];
+  }, [projects]);
+
+  function openCreateForm() {
+    setEditingProject(null);
+    setForm({ ...emptyForm, goal_id: goals[0]?.id ?? "" });
+    setIsFormOpen(true);
+  }
+
+  function openEditForm(project: Project) {
+    setEditingProject(project);
+    setForm({
+      title: project.title,
+      goal_id: project.goal_id,
+      description: project.description ?? "",
+      type: project.type,
+      priority: project.priority,
+      status: project.status === "archived" ? "not_started" : project.status,
+      target_date: project.target_date ?? "",
+    });
+    setIsFormOpen(true);
+  }
+
+  function closeForm() {
+    setIsFormOpen(false);
+    setEditingProject(null);
+    setForm(emptyForm);
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(editingProject ? `/api/projects/${editingProject.id}` : "/api/projects", {
+        method: editingProject ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title.trim(),
+          goal_id: form.goal_id,
+          description: form.description.trim() || null,
+          type: form.type,
+          priority: form.priority,
+          status: form.status,
+          target_date: form.target_date || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.detail ?? "Failed to save project");
+      }
+
+      const savedProject = (await response.json()) as Project;
+      setProjects((current) => editingProject ? current.map((project) => project.id === savedProject.id ? savedProject : project) : [savedProject, ...current]);
+      closeForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save project");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function deleteProject(project: Project) {
+    const confirmed = window.confirm(`Delete "${project.title}"? This will archive the project.`);
+    if (!confirmed) return;
+
+    setDeletingProjectId(project.id);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.detail ?? "Failed to delete project");
+      }
+      setProjects((current) => current.filter((item) => item.id !== project.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete project");
+    } finally {
+      setDeletingProjectId(null);
+    }
+  }
+
   return (
-    <div className="grid min-h-screen min-w-0 gap-4 text-app-primary 2xl:grid-cols-[minmax(0,1fr)_360px] 2xl:gap-6">
+    <div className="min-h-screen min-w-0 text-app-primary">
       <main className="min-w-0 space-y-6">
         <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Projects</h1>
-            <p className="mt-1 text-base text-app-muted">Manage all your projects and track their progress</p>
+            <p className="mt-1 text-base text-app-muted">Create workstreams under your goals and track progress manually.</p>
           </div>
           <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-subtle" />
               <input
-                className="h-11 w-full rounded-lg border border-app-border bg-app-input pl-10 pr-3 text-sm outline-none placeholder:text-[#64748B] focus:border-[#7C3AED]"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="h-11 w-full rounded-lg border border-app-border bg-app-input pl-10 pr-3 text-sm outline-none placeholder:text-app-subtle focus:border-[#7C3AED]"
                 placeholder="Search projects..."
               />
             </div>
-            <button className="flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-app-border bg-app-input px-4 text-sm text-app-secondary sm:flex-none">
-              <Filter className="h-4 w-4" />
-              Filter
-            </button>
-            <button className="flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#6D38E8] px-4 text-sm font-semibold shadow-lg shadow-[#7C3AED]/25 sm:flex-none">
+            <button
+              onClick={openCreateForm}
+              disabled={goals.length === 0}
+              className="flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#6D38E8] px-4 text-sm font-semibold text-white shadow-lg shadow-[#7C3AED]/25 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+            >
               <Plus className="h-4 w-4" />
               New Project
             </button>
           </div>
         </header>
+
+        {error && <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-500 dark:text-rose-300">{error}</div>}
 
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {stats.map((stat) => {
@@ -120,161 +298,164 @@ export default function ProjectsPage() {
           })}
         </section>
 
-        <div className="flex flex-col gap-3 border-b border-app-border lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex gap-6 overflow-x-auto text-sm sm:gap-8">
-            <button className="relative py-3 text-app-primary">
-              All Projects
-              <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#7C3AED]" />
-            </button>
-            <button className="py-3 text-app-muted">By Goal</button>
-          </div>
-          <div className="flex overflow-x-auto rounded-lg border border-app-border bg-app-elevated p-1 text-sm text-app-muted">
-            <button className="flex items-center gap-2 rounded-md bg-app-soft px-3 py-2 text-app-primary"><List className="h-4 w-4" />List</button>
-            <button className="flex items-center gap-2 rounded-md px-3 py-2"><Grid2X2 className="h-4 w-4" />Board</button>
-            <button className="flex items-center gap-2 rounded-md px-3 py-2"><BarChart3 className="h-4 w-4" />Timeline</button>
-          </div>
-        </div>
-
         <section className="space-y-3">
-          {projects.map((project) => {
-            const Icon = project.icon;
-            return (
-              <Panel key={project.title} className="grid gap-4 p-5 xl:grid-cols-[64px_minmax(220px,1fr)_minmax(150px,210px)_112px_126px_88px_24px] xl:items-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: `${project.color}25`, color: project.color }}>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: project.color }}>
-                    <Icon className="h-6 w-6 text-white" />
+          {isLoading ? (
+            <Panel className="flex min-h-64 items-center justify-center text-app-muted">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Loading projects
+            </Panel>
+          ) : goals.length === 0 ? (
+            <Panel className="min-h-64 px-5 py-12 text-center">
+              <FolderKanban className="mx-auto h-10 w-10 text-[#7C3AED]" />
+              <h2 className="mt-4 text-lg font-semibold">Create a goal first</h2>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-app-muted">Projects belong to goals, so add at least one goal before creating a project.</p>
+            </Panel>
+          ) : filteredProjects.length === 0 ? (
+            <Panel className="min-h-64 px-5 py-12 text-center">
+              <FolderKanban className="mx-auto h-10 w-10 text-[#7C3AED]" />
+              <h2 className="mt-4 text-lg font-semibold">{projects.length === 0 ? "No projects yet" : "No matching projects"}</h2>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-app-muted">{projects.length === 0 ? "Create your first project under a goal." : "Try a different search term."}</p>
+            </Panel>
+          ) : (
+            filteredProjects.map((project) => {
+              const meta = typeMeta[project.type];
+              const Icon = meta.icon;
+              const health = getProjectHealth(project);
+              return (
+                <Panel key={project.id} className="grid gap-4 p-5 xl:grid-cols-[64px_minmax(220px,1fr)_minmax(150px,210px)_126px_120px_92px] xl:items-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: `${meta.color}25`, color: meta.color }}>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: meta.color }}>
+                      <Icon className="h-6 w-6 text-white" />
+                    </div>
                   </div>
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-lg font-semibold">{project.title}</h2>
-                  <p className="mt-2 flex min-w-0 items-center gap-1.5 text-sm text-app-muted">
-                    <CalendarDays className="h-4 w-4" />
-                    <span className="truncate">Goal: {project.goal}</span>
-                  </p>
-                </div>
-                <div>
-                  <p className="mb-2 text-lg font-semibold">{project.progress}%</p>
-                  <div className="h-1.5 rounded-full bg-app-soft">
-                    <div className="h-full rounded-full" style={{ width: `${project.progress}%`, backgroundColor: project.color }} />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-lg font-semibold">{project.title}</h2>
+                      <span className="rounded-md bg-app-soft px-2 py-1 text-xs text-app-muted">{meta.label}</span>
+                      <span className="rounded-md bg-app-soft px-2 py-1 text-xs capitalize text-app-muted">{project.priority}</span>
+                    </div>
+                    <p className="mt-2 flex min-w-0 items-center gap-1.5 text-sm text-app-muted">
+                      <CalendarDays className="h-4 w-4" />
+                      <span className="truncate">Goal: {project.goal_title}</span>
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-sm text-app-muted">{project.description || "No description added."}</p>
                   </div>
-                </div>
-                <div className="border-t border-app-border pt-3 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
-                  <p className="text-base">{project.tasks}</p>
-                  <p className="text-sm text-app-muted">Tasks Completed</p>
-                </div>
-                <div className="border-t border-app-border pt-3 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
-                  <p className="text-base">{project.deadline}</p>
-                  <p className="text-sm text-app-muted">Deadline</p>
-                </div>
-                <StatusBadge status={project.status} />
-                <button className="justify-self-start text-app-subtle xl:justify-self-auto"><MoreVertical className="h-5 w-5" /></button>
-              </Panel>
-            );
-          })}
+                  <div>
+                    <p className="mb-2 text-lg font-semibold">{project.progress}%</p>
+                    <div className="h-1.5 rounded-full bg-app-soft">
+                      <div className="h-full rounded-full" style={{ width: `${project.progress}%`, backgroundColor: meta.color }} />
+                    </div>
+                  </div>
+                  <div className="border-t border-app-border pt-3 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
+                    <p className="text-base">{project.target_date ? new Date(project.target_date).toLocaleDateString() : "No deadline"}</p>
+                    <p className="text-sm text-app-muted">Deadline</p>
+                  </div>
+                  <StatusBadge label={health} />
+                  <div className="flex items-center gap-2 xl:justify-end">
+                    <button onClick={() => openEditForm(project)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-app-border bg-app-elevated text-app-muted transition hover:text-app-primary" aria-label={`Edit ${project.title}`}>
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => void deleteProject(project)} disabled={deletingProjectId === project.id} className="flex h-9 w-9 items-center justify-center rounded-lg border border-app-border bg-app-elevated text-rose-500 transition hover:bg-rose-500/10 disabled:opacity-60" aria-label={`Delete ${project.title}`}>
+                      {deletingProjectId === project.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </Panel>
+              );
+            })
+          )}
         </section>
-
-        <div className="flex flex-col gap-3 px-1 text-sm text-app-muted sm:flex-row sm:items-center sm:justify-between">
-          <p>Showing 1 to 6 of 12 projects</p>
-          <div className="flex items-center gap-2">
-            <button className="rounded-lg border border-app-border bg-app-elevated p-2 text-[#64748B]"><ChevronLeft className="h-4 w-4" /></button>
-            <button className="rounded-lg bg-[#4F3ACD] px-3 py-2 text-white">1</button>
-            <button className="rounded-lg border border-app-border bg-app-elevated px-3 py-2 text-app-primary">2</button>
-            <button className="rounded-lg border border-app-border bg-app-elevated p-2 text-app-primary"><ChevronRight className="h-4 w-4" /></button>
-          </div>
-        </div>
       </main>
 
-      <aside className="space-y-4">
-        <Panel className="p-5">
-          <h2 className="mb-5 text-lg font-semibold">Projects Overview</h2>
-          <div className="grid gap-5 sm:grid-cols-[160px_1fr] xl:grid-cols-1 2xl:grid-cols-[160px_1fr]">
-            <div className="relative h-40 w-40">
-              <svg className="h-40 w-40 -rotate-90" viewBox="0 0 160 160" aria-hidden="true">
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#334155" strokeWidth="22" />
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#22C55E" strokeWidth="22" strokeDasharray="365" strokeDashoffset="153" />
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#F59E0B" strokeWidth="22" strokeDasharray="365" strokeDashoffset="274" className="rotate-[209deg] origin-center" />
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#F43F5E" strokeWidth="22" strokeDasharray="365" strokeDashoffset="303" className="rotate-[299deg] origin-center" />
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#7C3AED" strokeWidth="22" strokeDasharray="365" strokeDashoffset="303" className="rotate-[360deg] origin-center" />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-semibold">12</span>
-                <span className="text-xs text-app-muted">Total</span>
-                <span className="text-xs text-app-muted">Projects</span>
+      {isFormOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:justify-center">
+          <Panel className="max-h-[92vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">{editingProject ? "Edit Project" : "Create Project"}</h2>
+                <p className="mt-1 text-sm text-app-muted">Attach this project to a goal and define the workstream clearly.</p>
               </div>
+              <button onClick={closeForm} className="rounded-lg p-2 text-app-subtle transition hover:bg-app-soft hover:text-app-primary" aria-label="Close">
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <div className="space-y-4 text-sm">
-              {[
-                ["On Track", "58%", "#22C55E"],
-                ["At Risk", "25%", "#F59E0B"],
-                ["Behind", "17%", "#F43F5E"],
-                ["Completed", "17%", "#7C3AED"],
-              ].map(([label, value, color]) => (
-                <div key={label} className="flex items-center justify-between gap-4">
-                  <span className="flex items-center gap-2 text-app-secondary"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />{label}</span>
-                  <span>{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Panel>
 
-        <Panel className="p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Upcoming Deadlines</h2>
-            <button className="text-xs text-[#3B82F6]">View Calendar</button>
-          </div>
-          <div className="space-y-5">
-            {deadlines.map((deadline) => {
-              const Icon = deadline.icon;
-              return (
-                <div key={deadline.title} className="grid grid-cols-[34px_1fr_auto] items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: deadline.color }}>
-                    <Icon className="h-4 w-4 text-white" />
-                  </div>
-                  <p className="text-sm font-medium">{deadline.title}</p>
-                  <div className="text-right">
-                    <p className="text-xs text-app-secondary">{deadline.date}</p>
-                    <p className={`mt-1 text-xs ${deadline.left.startsWith("56") ? "text-rose-300" : "text-orange-300"}`}>{deadline.left}</p>
-                  </div>
-                </div>
-              );
-            })}
-            <p className="text-sm text-app-subtle">+ 2 more deadlines</p>
-          </div>
-        </Panel>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <FieldLabel>Project title</FieldLabel>
+                <input required minLength={2} maxLength={160} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="h-11 w-full rounded-lg border border-app-border bg-app-input px-3 text-sm outline-none focus:border-[#7C3AED]" placeholder="DSA Preparation" />
+              </div>
 
-        <Panel className="border-[#7C3AED]/25 bg-[#101539]/70 p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-[#A855F7]" />
-            <h2 className="text-lg font-semibold">AI Project Insights</h2>
-            <span className="rounded-md bg-[#1D2A65] px-2 py-0.5 text-[10px] font-semibold text-blue-200">Beta</span>
-          </div>
-          <p className="text-sm text-app-muted">Based on your projects, here are some insights:</p>
-          <div className="mt-4 space-y-3 text-sm text-app-muted">
-            <p className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />You have 3 projects at risk.</p>
-            <p className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />Consider prioritizing System Design tasks.</p>
-            <p className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />You&apos;re most productive in the morning.</p>
-          </div>
-          <button className="mt-5 w-full rounded-lg bg-[#6D38E8] py-3 text-sm font-semibold">View Detailed Insights</button>
-        </Panel>
-
-        <Panel className="p-5">
-          <h2 className="text-lg font-semibold">Goal-wise Projects</h2>
-          <div className="mt-5 space-y-5">
-            {goalWise.map((item) => (
-              <div key={item.label}>
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span>{item.label}</span>
-                  <span>{item.value}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-app-border">
-                  <div className="h-full rounded-full" style={{ width: `${item.width}%`, backgroundColor: item.color }} />
+              <div className="space-y-2">
+                <FieldLabel>Parent goal</FieldLabel>
+                <div className="relative">
+                  <select required value={form.goal_id} onChange={(event) => setForm({ ...form, goal_id: event.target.value })} className="h-11 w-full appearance-none rounded-lg border border-app-border bg-app-input px-3 pr-10 text-sm text-app-primary outline-none transition [color-scheme:light] focus:border-[#7C3AED] dark:[color-scheme:dark]">
+                    {goals.map((goal) => <option key={goal.id} value={goal.id}>{goal.title}</option>)}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-subtle" />
                 </div>
               </div>
-            ))}
-          </div>
-        </Panel>
-      </aside>
+
+              <div className="space-y-2">
+                <FieldLabel>Description</FieldLabel>
+                <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={4} maxLength={1200} className="w-full resize-none rounded-lg border border-app-border bg-app-input px-3 py-3 text-sm outline-none focus:border-[#7C3AED]" placeholder="What does this project cover?" />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <FieldLabel>Type</FieldLabel>
+                  <div className="relative">
+                    <select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as ProjectType })} className="h-11 w-full appearance-none rounded-lg border border-app-border bg-app-input px-3 pr-10 text-sm text-app-primary outline-none transition [color-scheme:light] focus:border-[#7C3AED] dark:[color-scheme:dark]">
+                      {Object.entries(typeMeta).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-subtle" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Priority</FieldLabel>
+                  <div className="relative">
+                    <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as ProjectPriority })} className="h-11 w-full appearance-none rounded-lg border border-app-border bg-app-input px-3 pr-10 text-sm text-app-primary outline-none transition [color-scheme:light] focus:border-[#7C3AED] dark:[color-scheme:dark]">
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-subtle" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Target date</FieldLabel>
+                  <div className="relative">
+                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-subtle" />
+                    <input type="date" value={form.target_date} onChange={(event) => setForm({ ...form, target_date: event.target.value })} className="h-11 w-full rounded-lg border border-app-border bg-app-input px-10 text-sm text-app-primary outline-none transition [color-scheme:light] focus:border-[#7C3AED] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-60 dark:[&::-webkit-calendar-picker-indicator]:invert" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Status</FieldLabel>
+                  <div className="relative">
+                    <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ProjectStatus })} className="h-11 w-full appearance-none rounded-lg border border-app-border bg-app-input px-3 pr-10 text-sm text-app-primary outline-none transition [color-scheme:light] focus:border-[#7C3AED] dark:[color-scheme:dark]">
+                      <option value="not_started">Not Started</option>
+                      <option value="active">Active</option>
+                      <option value="paused">Paused</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-subtle" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                <button type="button" onClick={closeForm} className="h-11 rounded-lg border border-app-border px-5 text-sm font-semibold text-app-secondary">Cancel</button>
+                <button disabled={isSaving} className="flex h-11 items-center justify-center gap-2 rounded-lg bg-[#6D38E8] px-5 text-sm font-semibold text-white shadow-lg shadow-[#7C3AED]/25 disabled:opacity-70">
+                  {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {editingProject ? "Save Changes" : "Create Project"}
+                </button>
+              </div>
+            </form>
+          </Panel>
+        </div>
+      )}
     </div>
   );
 }
